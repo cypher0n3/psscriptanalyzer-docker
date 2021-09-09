@@ -1,25 +1,48 @@
 # PSScriptAnalyzer-Docker
 
+[![pipeline status](https://gitlab.com/cypher_zero/psscriptanalyzer-docker/badges/master/pipeline.svg)](https://gitlab.com/cypher_zero/psscriptanalyzer-docker/-/commits/master)
+
 A basic docker image based off of [Microsoft's PowerShell image](https://hub.docker.com/r/microsoft/powershell/) which includes [PSScriptAnalyzer](https://github.com/PowerShell/PSScriptAnalyzer)
 
 ## Usage
 
-For advanced usage of PSScriptAnalyzer modules (`Invoke-ScriptAnalyzer`) see: <https://github.com/PowerShell/PSScriptAnalyzer>
+For advanced usage of PSScriptAnalyzer modules (`Invoke-ScriptAnalyzer`) see: <https://github.com/PowerShell/PSScriptAnalyzer>.
+
+This image is automatically updated weekly.
 
 ### Analyze a script on your local system
 
 ```bash
-docker run -it -v ./test:/test cypher0n3/psscriptanalyzer-docker:latest -Command "Invoke-ScriptAnalyzer -Path /test/MyScript.ps1"; echo
+docker run -v ./test:/test cypher0n3/psscriptanalyzer-docker:latest "Invoke-ScriptAnalyzer -Path /test/*.ps1"
 ```
 
 ### In GitLab pipeline
 
+When running in a GitLab pipeline, you need to override the default entry point and call `pwsh -c Invoke-ScriptAnalyzer` as part of the `script` block.
+This is due to the way that GitLab sets up the container, etc.
+See below for a working example:
+
 ```yaml
 psscriptanalyzer:
-  image: cypher0n3/psscriptanalyzer-docker:latest
+test-container:
+  image:
+    name: registry.gitlab.com/cypher_zero/psscriptanalyzer-docker:latest
+    entrypoint: ["/bin/bash", "-c"]
   variables:
-    PS1_TESTPATH: ./test
-  allow_failure: true
+    PS1_TESTPATH: ./test/*.ps1
   script:
-    - Invoke-ScriptAnalyzer -Path $PS1_TESTPATH/*.ps1
+    - output=$(pwsh -c "Invoke-ScriptAnalyzer -Path $PS1_TESTPATH")
+    - echo "${output}"
+    - |
+      if [[ ! -z ${output} ]]; then
+        echo "Failures detected; see above."
+        exit 1
+      fi
 ```
+
+## Contributing
+
+Code and pipeline automation for this project is maintained in GitLab here: <https://gitlab.com/cypher_zero/psscriptanalyzer-docker>
+
+Please submit all issues and merge requests via the above GitLab project.
+Submissions and issues from other sources (e.g. GitHub) will *not* be addressed.

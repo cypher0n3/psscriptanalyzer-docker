@@ -1,14 +1,82 @@
 ---
 stages:
   - build
-  - publish
   - test
 
-test-container:
-  image: cypher0n3/psscriptanalyzer-docker:latest
+variables:
+  DOCKER_IMAGE_TAG: latest
+
+build-container:
+  stage: build
+  image: docker:19.03.12
   variables:
-    PS1_TESTPATH: ./test
-  allow_failure: true
+    DOCKER_TLS_CERTDIR: "/certs"
+  services:
+    - docker:19.03.13-dind
+  allow_failure: false
+  before_script:
+    - echo "$DOCKER_REGISTRY_PASS" | docker login --username $DOCKER_REGISTRY_USER --password-stdin
+    - echo "$GITLAB_REGISTRY_TOKEN" | docker login registry.gitlab.com --username $GITLAB_REGISTRY_USER --password-stdin
   script:
-    - Invoke-ScriptAnalyzer -Path $PS1_TESTPATH/*.ps1
+    - docker build -t cypher0n3/psscriptanalyzer-docker:$DOCKER_IMAGE_TAG .
+    - docker run cypher0n3/psscriptanalyzer-docker:$DOCKER_IMAGE_TAG
+    - docker run -v test:/test cypher0n3/psscriptanalyzer-docker:$DOCKER_IMAGE_TAG 'Invoke-ScriptAnalyzer -Path /test/*.ps1'
+    - docker tag cypher0n3/psscriptanalyzer-docker:$DOCKER_IMAGE_TAG registry.gitlab.com/cypher_zero/psscriptanalyzer-docker:$DOCKER_IMAGE_TAG
+    - docker push cypher0n3/psscriptanalyzer-docker:$DOCKER_IMAGE_TAG
+    - docker push registry.gitlab.com/cypher_zero/psscriptanalyzer-docker:$DOCKER_IMAGE_TAG
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "manual"
+
+.test-container:
+  stage: test
+  image:
+    name: registry.gitlab.com/cypher_zero/psscriptanalyzer-docker:latest
+    entrypoint: ["/bin/bash", "-c"]
+  variables:
+    PS1_TESTPATH: ./test/*.ps1
+  script:
+    - output=$(pwsh -c "Invoke-ScriptAnalyzer -Path $PS1_TESTPATH")
+    - echo "${output}"
+    - |
+      if [[ ! -z ${output} ]]; then
+        echo "Failures detected; see above."
+        exit 1
+      fi
+  rules:
+    - if: '$CI_PIPELINE_SOURCE != "schedule" && $CI_PIPELINE_SOURCE != "manual"'
+
+pass-test-container:
+  extends: .test-container
+  variables:
+    PS1_TESTPATH: ./test/TestScript-Pass.ps1
+
+fail-test-container:
+  extends: .test-container
+  variables:
+    PS1_TESTPATH: ./test/TestScript-Fail.ps1
+  script:
+    - output=$(pwsh -c "Invoke-ScriptAnalyzer -Path $PS1_TESTPATH")
+    - echo "${output}"
+    - |
+      if [[ ! -z ${output} ]]; then
+        echo "Failures detected (which is expected); see above."
+        exit 0
+      fi
+
+pass-test-container-scheduled:
+  extends: pass-test-container
+  needs:
+    - build-container
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "manual"
+
+fail-test-container-scheduled:
+  extends: fail-test-container
+  needs:
+    - build-container
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "manual"
 ...
