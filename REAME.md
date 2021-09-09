@@ -24,7 +24,6 @@ See below for a working example:
 
 ```yaml
 psscriptanalyzer:
-test-container:
   image:
     name: registry.gitlab.com/cypher_zero/psscriptanalyzer-docker:latest
     entrypoint: ["/bin/bash", "-c"]
