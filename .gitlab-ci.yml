@@ -1,0 +1,14 @@
+---
+stages:
+  - build
+  - publish
+  - test
+
+test-container:
+  image: cypher0n3/psscriptanalyzer-docker:latest
+  variables:
+    PS1_TESTPATH: ./test
+  allow_failure: true
+  script:
+    - Invoke-ScriptAnalyzer -Path $PS1_TESTPATH/*.ps1
+...
