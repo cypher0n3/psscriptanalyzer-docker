@@ -33,7 +33,7 @@ psscriptanalyzer:
     - output=$(pwsh -c "Invoke-ScriptAnalyzer -Path $PS1_TESTPATH")
     - echo "${output}"
     - |
-      if [[ ! -z ${output} ]]; then
+      if [[ -n ${output} ]]; then
         echo "Failures detected; see above."
         exit 1
       fi
