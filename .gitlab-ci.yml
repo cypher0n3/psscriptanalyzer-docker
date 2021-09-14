@@ -3,13 +3,11 @@ stages:
   - build
   - test
 
-variables:
-  DOCKER_IMAGE_TAG: latest
-
 build-container:
   stage: build
   image: docker:19.03.12
   variables:
+    DOCKER_IMAGE_TAG: latest
     DOCKER_TLS_CERTDIR: "/certs"
   services:
     - docker:19.03.13-dind
@@ -19,8 +17,15 @@ build-container:
     - echo "$GITLAB_REGISTRY_TOKEN" | docker login registry.gitlab.com --username $GITLAB_REGISTRY_USER --password-stdin
   script:
     - docker build -t cypher0n3/psscriptanalyzer-docker:$DOCKER_IMAGE_TAG .
-    - docker run cypher0n3/psscriptanalyzer-docker:$DOCKER_IMAGE_TAG
-    - docker run -v test:/test cypher0n3/psscriptanalyzer-docker:$DOCKER_IMAGE_TAG 'Invoke-ScriptAnalyzer -Path /test/*.ps1'
+    - echo "====== Checking Container ======"
+    - working_dir="$(pwd)"
+    - test1_output="$(docker run cypher0n3/psscriptanalyzer-docker:$DOCKER_IMAGE_TAG)"
+    - echo "${test1_output}"
+    - if [[ "${test1_output}" == "" ]]; then exit 1; else echo "Test 1 passed."; fi
+    - test2_output="$(docker run -v $working_dir/test:/test cypher0n3/psscriptanalyzer-docker:$DOCKER_IMAGE_TAG Invoke-ScriptAnalyzer -Path /test/*.ps1)"
+    - echo "${test2_output}"
+    - if [[ "${test2_output}" == "" ]]; then exit 2; else echo "Test 2 passed."; fi
+    - echo "====== Uploading Container ======"
     - docker tag cypher0n3/psscriptanalyzer-docker:$DOCKER_IMAGE_TAG registry.gitlab.com/cypher_zero/psscriptanalyzer-docker:$DOCKER_IMAGE_TAG
     - docker push cypher0n3/psscriptanalyzer-docker:$DOCKER_IMAGE_TAG
     - docker push registry.gitlab.com/cypher_zero/psscriptanalyzer-docker:$DOCKER_IMAGE_TAG
@@ -28,23 +33,42 @@ build-container:
     - if: $CI_PIPELINE_SOURCE == "schedule"
     - if: $CI_PIPELINE_SOURCE == "manual"
 
+build-tag:
+  stage: build
+  extends: build-container
+  variables:
+    DOCKER_IMAGE_TAG: $CI_COMMIT_TAG
+  rules:
+    - if: $CI_COMMIT_TAG
+
+build-test:
+  stage: build
+  extends: build-container
+  variables:
+    DOCKER_IMAGE_TAG: $CI_MERGE_REQUEST_IID
+  rules:
+    - if: $CI_MERGE_REQUEST_IID
+
 .test-container:
   stage: test
   image:
     name: registry.gitlab.com/cypher_zero/psscriptanalyzer-docker:latest
     entrypoint: ["/bin/bash", "-c"]
   variables:
+    DOCKER_IMAGE_TAG: $CI_MERGE_REQUEST_IID
     PS1_TESTPATH: ./test/*.ps1
+    FAIL_MSG: Failures detected; see above.
+    EXIT_ERR_CODE: 1
   script:
     - output=$(pwsh -c "Invoke-ScriptAnalyzer -Path $PS1_TESTPATH")
     - echo "${output}"
     - |
       if [[ -n ${output} ]]; then
-        echo "Failures detected; see above."
-        exit 1
+        echo "$FAIL_MSG"
+        exit $EXIT_ERR_CODE
       fi
   rules:
-    - if: '$CI_PIPELINE_SOURCE != "schedule" && $CI_PIPELINE_SOURCE != "manual"'
+    - if: $CI_MERGE_REQUEST_IID
 
 pass-test-container:
   extends: .test-container
@@ -55,17 +79,13 @@ fail-test-container:
   extends: .test-container
   variables:
     PS1_TESTPATH: ./test/TestScript-Fail.ps1
-  script:
-    - output=$(pwsh -c "Invoke-ScriptAnalyzer -Path $PS1_TESTPATH")
-    - echo "${output}"
-    - |
-      if [[ -n ${output} ]]; then
-        echo "Failures detected (which is expected); see above."
-        exit 0
-      fi
+    FAIL_MSG: Failures detected (which is expected); see above.
+    EXIT_ERR_CODE: 0
 
 pass-test-container-scheduled:
   extends: pass-test-container
+  variables:
+    DOCKER_IMAGE_TAG: latest
   needs:
     - build-container
   rules:
@@ -74,9 +94,25 @@ pass-test-container-scheduled:
 
 fail-test-container-scheduled:
   extends: fail-test-container
+  variables:
+    DOCKER_IMAGE_TAG: latest
   needs:
     - build-container
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
     - if: $CI_PIPELINE_SOURCE == "manual"
+
+pass-test-container-tag:
+  extends: pass-test-container
+  variables:
+    DOCKER_IMAGE_TAG: $CI_COMMIT_TAG
+  rules:
+    - if: $CI_COMMIT_TAG
+
+fail-test-container-tag:
+  extends: fail-test-container
+  variables:
+    DOCKER_IMAGE_TAG: $CI_COMMIT_TAG
+  rules:
+    - if: $CI_COMMIT_TAG
 ...

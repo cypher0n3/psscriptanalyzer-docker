@@ -4,6 +4,26 @@
 
 A basic docker image based off of [Microsoft's PowerShell image](https://hub.docker.com/r/microsoft/powershell/) which includes [PSScriptAnalyzer](https://github.com/PowerShell/PSScriptAnalyzer)
 
+## Tags
+
+### latest
+
+The latest tag is always the latest, hopefully stable, build.
+This tag is updated automatically every Monday based on the latest [PowerShell container](https://hub.docker.com/r/microsoft/powershell/) and stable [PSScriptAnalyzer](https://github.com/PowerShell/PSScriptAnalyzer).
+
+If the pipeline status above indicates a failure, then this image is unstable.
+
+### stable-*
+
+These tags are known stable builds as tested by the developer.
+These correspond to the same tag name in the code repository.
+Identifying numbers correspond to the date the tag was created.
+
+### Numbered tags
+
+Numbered tags correspond to GitLab CI pipeline IIDs and should be considered development builds.
+Use at your own risk.
+
 ## Usage
 
 For advanced usage of PSScriptAnalyzer modules (`Invoke-ScriptAnalyzer`) see: <https://github.com/PowerShell/PSScriptAnalyzer>.
