@@ -32,6 +32,7 @@ build-container:
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
     - if: $CI_PIPELINE_SOURCE == "manual"
+    - if: $CI_COMMIT_BRANCH == "master"
 
 build-tag:
   stage: build
@@ -91,6 +92,7 @@ pass-test-container-scheduled:
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
     - if: $CI_PIPELINE_SOURCE == "manual"
+    - if: $CI_COMMIT_BRANCH == "master"
 
 fail-test-container-scheduled:
   extends: fail-test-container
@@ -101,6 +103,7 @@ fail-test-container-scheduled:
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
     - if: $CI_PIPELINE_SOURCE == "manual"
+    - if: $CI_COMMIT_BRANCH == "master"
 
 pass-test-container-tag:
   extends: pass-test-container
