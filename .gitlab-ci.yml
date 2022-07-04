@@ -5,14 +5,15 @@ stages:
 
 build-container:
   stage: build
-  image: docker:19.03.12
+  image: docker:20.10.16
   variables:
     DOCKER_IMAGE_TAG: latest
     DOCKER_TLS_CERTDIR: "/certs"
   services:
-    - docker:19.03.13-dind
+    - docker:20.10.16-dind
   allow_failure: false
   before_script:
+    - docker info
     - echo "$DOCKER_REGISTRY_PASS" | docker login --username $DOCKER_REGISTRY_USER --password-stdin
     - echo "$GITLAB_REGISTRY_TOKEN" | docker login registry.gitlab.com --username $GITLAB_REGISTRY_USER --password-stdin
   script:
